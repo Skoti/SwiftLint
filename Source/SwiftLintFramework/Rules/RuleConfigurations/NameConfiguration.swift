@@ -13,6 +13,7 @@ public struct NameConfiguration: RuleConfiguration, Equatable {
     var maxLength: SeverityLevelsConfiguration
     var excluded: Set<String>
     private var allowedSymbolsSet: Set<String>
+    private var allowedSymbolsSetForConstants: Set<String>?
     var validatesStartWithLowercase: Bool
 
     var minLengthThreshold: Int {
@@ -27,17 +28,28 @@ public struct NameConfiguration: RuleConfiguration, Equatable {
         return CharacterSet(safeCharactersIn: allowedSymbolsSet.joined())
     }
 
+    var allowedSymbolsForConstants: CharacterSet? {
+        guard let allowedSymbolsSetForConstants = allowedSymbolsSetForConstants else {
+            return nil
+        }
+        return CharacterSet(safeCharactersIn: allowedSymbolsSetForConstants.joined())
+    }
+
     public init(minLengthWarning: Int,
                 minLengthError: Int,
                 maxLengthWarning: Int,
                 maxLengthError: Int,
                 excluded: [String] = [],
                 allowedSymbols: [String] = [],
+                allowedSymbolsForConstants: [String]? = nil,
                 validatesStartWithLowercase: Bool = true) {
         minLength = SeverityLevelsConfiguration(warning: minLengthWarning, error: minLengthError)
         maxLength = SeverityLevelsConfiguration(warning: maxLengthWarning, error: maxLengthError)
         self.excluded = Set(excluded)
         self.allowedSymbolsSet = Set(allowedSymbols)
+        if let allowedSymbolsForConstants = allowedSymbolsForConstants {
+            self.allowedSymbolsSetForConstants = Set(allowedSymbolsForConstants)
+        }
         self.validatesStartWithLowercase = validatesStartWithLowercase
     }
 
@@ -58,6 +70,9 @@ public struct NameConfiguration: RuleConfiguration, Equatable {
         if let allowedSymbols = [String].array(of: configurationDict["allowed_symbols"]) {
             self.allowedSymbolsSet = Set(allowedSymbols)
         }
+        if let allowedSymbolsForConstants = [String].array(of: configurationDict["allowed_symbols_for_constants"]) {
+            self.allowedSymbolsSetForConstants = Set(allowedSymbolsForConstants)
+        }
 
         if let validatesStartWithLowercase = configurationDict["validates_start_with_lowercase"] as? Bool {
             self.validatesStartWithLowercase = validatesStartWithLowercase
@@ -69,11 +84,21 @@ public struct NameConfiguration: RuleConfiguration, Equatable {
     }
 
     public static func == (lhs: NameConfiguration, rhs: NameConfiguration) -> Bool {
-        return lhs.minLength == rhs.minLength &&
+        var result = lhs.minLength == rhs.minLength &&
             lhs.maxLength == rhs.maxLength &&
             zip(lhs.excluded, rhs.excluded).reduce(true) { $0 && ($1.0 == $1.1) } &&
-            zip(lhs.allowedSymbolsSet, rhs.allowedSymbolsSet).reduce(true) { $0 && ($1.0 == $1.1) } &&
-            lhs.validatesStartWithLowercase == rhs.validatesStartWithLowercase
+            zip(lhs.allowedSymbolsSet, rhs.allowedSymbolsSet).reduce(true) { $0 && ($1.0 == $1.1) }
+
+        if result {
+            switch (lhs.allowedSymbolsSetForConstants, rhs.allowedSymbolsSetForConstants) {
+            case (.none, .some), (.some, .none):
+                result = false
+            case let (.some(lhsConstantAllowedSymbols), .some(rhsConstantAllowedSymbols)):
+                result = zip(lhsConstantAllowedSymbols, rhsConstantAllowedSymbols).reduce(true) { $0 && ($1.0 == $1.1) }
+            default: break
+            }
+        }
+        return result && lhs.validatesStartWithLowercase == rhs.validatesStartWithLowercase
     }
 }
 

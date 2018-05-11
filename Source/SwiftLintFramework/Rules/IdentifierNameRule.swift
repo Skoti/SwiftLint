@@ -40,7 +40,12 @@ public struct IdentifierNameRule: ASTRule, ConfigurationProviderRule {
 
             let type = self.type(for: kind)
             if !isFunction {
-                let allowedSymbols = configuration.allowedSymbols.union(.alphanumerics)
+                let allowedSymbols: CharacterSet
+                if kind == .varStatic, let allowedSymbolsForConstants = configuration.allowedSymbolsForConstants {
+                    allowedSymbols = allowedSymbolsForConstants.union(.alphanumerics)
+                } else {
+                    allowedSymbols = configuration.allowedSymbols.union(.alphanumerics)
+                }
                 if !allowedSymbols.isSuperset(of: CharacterSet(safeCharactersIn: name)) {
                     return [
                         StyleViolation(ruleDescription: description,
